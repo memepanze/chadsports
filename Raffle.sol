@@ -14,6 +14,7 @@ pragma solidity ^0.8.0;
 // OpenZeppelin
 import "./openzeppelin/Ownable.sol";
 import "./openzeppelin/Strings.sol";
+import "./openzeppelin/ReentrancyGuard.sol";
 
 // Chainlink
 import "./chainlink-vrf/VRFCoordinatorV2Interface.sol";
@@ -34,7 +35,7 @@ import "./Utils.sol";
 * The firstMintersWinners will share 80% of the Raffle Pot
 * The lastMintersWinners will share 20% of the Raffle Pot
 */
-contract Raffle is VRFConsumerBaseV2, Ownable {
+contract Raffle is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     using Strings for uint256;
 
     /// @notice The address of the NFT minting contract
@@ -127,10 +128,21 @@ contract Raffle is VRFConsumerBaseV2, Ownable {
         _;
     }
 
-    constructor(uint64 _vrfSubId) VRFConsumerBaseV2(0x2eD832Ba664535e5886b75D64C46EB9a228C2610)
+    // E R R O R S
+
+    error Chad__TransferFailed();
+
+    error Chad__BalanceIsEmpty();
+
+    // E V E N T S
+
+    /// @notice Emitted on withdrawBalance() 
+    event BalanceWithdraw(address to, uint amount);
+
+    constructor(uint64 _vrfSubId, uint _cap) VRFConsumerBaseV2(0x2eD832Ba664535e5886b75D64C46EB9a228C2610)
     {
         s_subscriptionId = _vrfSubId;
-        firstMintersCap = 500;
+        firstMintersCap = _cap;
     }
 
     /// @notice Set the address of the minting contract. Only the owner of the contract can call this function.
@@ -218,14 +230,25 @@ contract Raffle is VRFConsumerBaseV2, Ownable {
     
     /// @notice Reward the winners of the Raffle
     function rewardWinners() external payable onlyOwner {
-        require(address(this).balance > 0, "Contract balance is empty");
+        uint rafflePot = address(this).balance;
+        if(rafflePot == 0){
+            revert Chad__BalanceIsEmpty();
+        }
         for(uint i; i < firstMintersWinners.length; i++){
             // 80% of the Raffle Pot will be transfer to the 6 winners (first 500 minters)
-            payable(firstMintersWinners[i]).transfer(address(this).balance*80/(6*100));
+            bool sent;
+            (sent, ) = firstMintersWinners[i].call{value:rafflePot*80/(6*100)}("");
+            if (!sent) {
+                revert Chad__TransferFailed();
+            }
         }
         for(uint i; i < lastMintersWinners.length; i++){
             // 20% of the Raffle Pot will be transfer to the 6 winners (over first 500 minters)
-            payable(lastMintersWinners[i]).transfer(address(this).balance*20/(6*100));
+            bool sent;
+            (sent, ) = firstMintersWinners[i].call{value:rafflePot*20/(6*100)}("");
+            if (!sent) {
+                revert Chad__TransferFailed();
+            }
         }
     }
 
@@ -235,9 +258,16 @@ contract Raffle is VRFConsumerBaseV2, Ownable {
     }
 
     /// @notice Withdraw the contract balance to the contract owner
-    /// @param _receiver Recipient of the earned balance
-    function withdrawBalance(address _receiver, uint _amount) public payable onlyOwner {
-        require(_amount > 0, "Value is 0.");
-        payable(_receiver).transfer(_amount * 10**18);
+    /// @param _to Recipient of the withdrawal
+    function withdrawBalance(address _to) external onlyOwner nonReentrant {
+        uint amount = address(this).balance;
+        bool sent;
+
+        (sent, ) = _to.call{value: amount}("");
+        if (!sent) {
+            revert Chad__TransferFailed();
+        }
+
+        emit BalanceWithdraw(_to, amount);
     }
 }
