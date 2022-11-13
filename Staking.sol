@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 // OpenZeppelin
-import "./IERC1155.sol";
-import "./IERC1155Receiver.sol";
-import "./Ownable.sol";
-import "./ReentrancyGuard.sol";
+import "./openzeppelin/IERC1155.sol";
+import "./openzeppelin/IERC1155Receiver.sol";
+import "./openzeppelin/Ownable.sol";
+import "./openzeppelin/ReentrancyGuard.sol";
 
 // Utils functions
 import "./Utils.sol";
