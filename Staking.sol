@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 // OpenZeppelin
-import "./openzeppelin/IERC1155.sol";
-import "./openzeppelin/IERC1155Receiver.sol";
-import "./openzeppelin/Ownable.sol";
-import "./openzeppelin/ReentrancyGuard.sol";
+import "./IERC1155.sol";
+import "./IERC1155Receiver.sol";
+import "./Ownable.sol";
+import "./ReentrancyGuard.sol";
 
 // Utils functions
 import "./Utils.sol";
@@ -21,11 +21,14 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     /// @notice map each address to a submissionId {uint} and inside of each: map a rank {uint} to a teamId {uint}
     mapping (address => mapping(uint => mapping(uint => uint) )) public submission;
 
-    /// @notice 
+    /// @notice The number of submissions for each user address
     mapping(address => uint) public submissionCount;
 
-    /// @notice
+    /// @notice Track the number of NFTs (tokenID) per user address
     mapping(uint => mapping(address => uint)) public nftOwners;
+
+    /// @notice Track all the submissions for each user address
+    mapping (address => uint[][]) public allSubmissions;
 
     /// @notice an array of the final ranking of the 4 teams in the World Cup
     uint[4] public finalRanking;
@@ -36,16 +39,49 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     /// @notice List of winners
     address[] public winners;
 
+    /// @notice The end date for the minting
+    /// @dev for the 2022 world cup 1670594400
+    uint public endDate;
+
     // M O D I F I E R
 
     /// @notice NFTs hodlers can change their rankings until 1 hour before the Top 16
     modifier changeRankings {
-        require(block.timestamp <= 1670594400);
+        require(block.timestamp <= endDate);
         _;
     }
 
+    // E V E N T S
+
+    /// @notice Emitted on the receive()
+    /// @param amount The amount of received Eth
+    event ReceivedEth(uint amount);
+
+    /// @notice Emitted on withdrawBalance() 
+    event BalanceWithdraw(address to, uint amount);
+
+    // E R R O R
+
+    error Chad__FinalRankingNotSet();
+
+    error Chad__BalanceIsEmpty();
+
+    error Chad__TransferFailed();
+
     constructor(address _nft) {
         nft = IERC1155(_nft);
+    }
+
+    /// @notice Get the 4 teams ranked in a submission
+    /// @return An array of tokenIds
+    function getSubmission(uint256 _submissionId) external view returns(uint[] memory) {
+        uint[] memory teams = new uint[](4);
+        teams[0] = submission[msg.sender][_submissionId][1];
+        teams[1] = submission[msg.sender][_submissionId][2];
+        teams[2] = submission[msg.sender][_submissionId][3];
+        teams[3] = submission[msg.sender][_submissionId][4];
+
+        return teams;
     }
 
     /// @notice User stake batch 4 teams (ERC1155) by ranking the NFTs from 1 to 4.
@@ -79,6 +115,8 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         nftOwners[_rank2][msg.sender]++;
         nftOwners[_rank3][msg.sender]++;
         nftOwners[_rank4][msg.sender]++;
+
+        allSubmissions[msg.sender].push(ids);
     }
 
     /// @notice User unstakes batch its 4 teams (ERC1155).
@@ -108,11 +146,18 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         nft.safeBatchTransferFrom(address(this), msg.sender, ids, amounts, "");
     }
 
+    /// @notice Set the end date (timestamp) for the minting.
+    function setEndDate(uint _date) external onlyOwner {
+        endDate = _date;
+    }
+
     // R E W A R D
 
     /// @notice Check if a ranking submission is winning.
     function isWinner(uint _submissionId) external {
-        require(isFinalRankingSet, "Final Ranking Not Set");
+        if(!isFinalRankingSet){
+            revert Chad__FinalRankingNotSet();
+        }
         require(submission[msg.sender][_submissionId][1] == finalRanking[0], "Not eligible");
         require(submission[msg.sender][_submissionId][2] == finalRanking[1], "Not eligible");
         require(submission[msg.sender][_submissionId][3] == finalRanking[2], "Not eligible");
@@ -130,11 +175,40 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         isFinalRankingSet = true;
     }
 
+    
     /// @notice Admin function to reward the list of Winners
-    function rewardWinners() public payable onlyOwner {
-        for(uint i; i < winners.length; i++){
-            payable(address(winners[i])).transfer(address(this).balance*50/100*winners.length);
+    function rewardWinners() external onlyOwner {
+        uint stakingPot = address(this).balance;
+        if(stakingPot == 0){
+            revert Chad__BalanceIsEmpty();
         }
+        for(uint i; i < winners.length; i++){
+            
+            bool sent;
+            (sent, ) = address(winners[i]).call{value:stakingPot/winners.length}("");
+            if (!sent) {
+                revert Chad__TransferFailed();
+            }
+        }
+    }
+
+    /// @notice The Staking contract will receive the rewards from the Minting Contract.
+    receive() external payable {
+        emit ReceivedEth(msg.value);
+    }
+
+    /// @notice Withdraw the contract balance to the contract owner
+    /// @param _to Recipient of the withdrawal
+    function withdrawBalance(address _to) external onlyOwner nonReentrant {
+        uint amount = address(this).balance;
+        bool sent;
+
+        (sent, ) = _to.call{value: amount}("");
+        if (!sent) {
+            revert Chad__TransferFailed();
+        }
+
+        emit BalanceWithdraw(_to, amount);
     }
 
 
