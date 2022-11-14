@@ -84,6 +84,23 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         return teams;
     }
 
+    /// @notice Get all the submissions for a wallet address
+    /// @return An array of arrays of tokenIds
+    function getAllSubmissions() external view returns(uint[][] memory) {
+        uint[][] memory _allSub = new uint[][](submissionCount[msg.sender]);
+        for(uint i; i < submissionCount[msg.sender]; i++){
+            uint[] memory teams = new uint[](4);
+            teams[0] = submission[msg.sender][i][1];
+            teams[1] = submission[msg.sender][i][2];
+            teams[2] = submission[msg.sender][i][3];
+            teams[3] = submission[msg.sender][i][4];
+
+            _allSub[i] = teams;
+        }
+
+        return _allSub;
+    }
+
     /// @notice User stake batch 4 teams (ERC1155) by ranking the NFTs from 1 to 4.
     /// @dev This function can be called before the start of the Top 16 of the world cup.
     function stakeBatch(uint8 _rank1, uint8 _rank2, uint8 _rank3, uint8 _rank4) external nonReentrant changeRankings {
