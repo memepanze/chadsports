@@ -14,17 +14,17 @@ pragma solidity ^0.8.0;
 */
 
 // OpenZeppelin
-import "./ERC1155.sol";
-import "./ERC1155Supply.sol";
-import "./IERC721.sol";
-import "./IERC2981.sol";
-import "./Ownable.sol";
-import "./Strings.sol";
-import "./ReentrancyGuard.sol";
+import "./openzeppelin/ERC1155.sol";
+import "./openzeppelin/ERC1155Supply.sol";
+import "./openzeppelin/IERC721.sol";
+import "./openzeppelin/IERC2981.sol";
+import "./openzeppelin/Ownable.sol";
+import "./openzeppelin/Strings.sol";
+import "./openzeppelin/ReentrancyGuard.sol";
 
 // Chainlink
-import "./VRFCoordinatorV2Interface.sol";
-import "./VRFConsumerBaseV2.sol";
+import "./chainlink-vrf/VRFCoordinatorV2Interface.sol";
+import "./chainlink-vrf/VRFConsumerBaseV2.sol";
 
 // Raffle
 import "./IRaffle.sol";
@@ -121,7 +121,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     uint32 numWordsBatch = 4;
 
     /// @notice royalties recipient address
-    address public _recipient;
+    address _recipient;
 
     /// @notice The standard mint price for single specific mint
     uint internal mintPrice;
@@ -152,7 +152,6 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     /// @param randomWords number of random numbers requested
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
 
-    /// @notice Emitted on withdrawBalance() 
     event BalanceWithdraw(address to, uint amount);
 
     // E R R O R S
@@ -226,9 +225,9 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     constructor(uint64 _vrfSubId) ERC1155("")
         VRFConsumerBaseV2(0x2eD832Ba664535e5886b75D64C46EB9a228C2610)
         {
-        name = "Chad Sports Fuji";
+        name = "ChadSports";
         symbol = "CHAD";
-        _uriBase = "ipfs://bafybeidtqkdn6uocf3iq6ilnko4zej44mpb3xn5h3yc72gg3c2cuvw6iha/"; // IPFS base for ChadSports collection
+        _uriBase = "ipfs://QmQyoRPzJpceXmv3uApjam8hLYXwRgThvg8vQ4wdWX9p4M/"; // IPFS base for ChadSports collection
 
         mintPrice = 2 ether;
         // 20000000000000000
@@ -313,7 +312,6 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     /// @notice Mint specific tokenIDs.
     /// @param _ids An array of the tokenIDs to mint.
     /// @dev the array must contain 1 or 4 values
-    /// @dev the tokenIds are from 1 to 32
     function mint(uint[] memory _ids) public payable nonReentrant isEOA
         payableMint(_ids) {
         if(_ids.length > 1){
@@ -332,7 +330,6 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         IRaffle(raffle).incrementMinters(msg.sender);
     }
 
-    /// @notice Store the address of each random minters to be used in the callback function for the Raffle contract interface.
     mapping (uint => address) randomMinters;
 
     /// @notice Function to request random numbers.
@@ -377,15 +374,8 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         if(_randomWords.length>1){
             for(uint i=0; i<_randomWords.length; i++){
                 uint j;
-                // The contract start the tokenId at 1 so the mximum tokenId is 32
-                uint randnum = _randomWords[i] % 33;
-                // make sure that no tokenId 0 is minted
-                if(randnum == 0){
-                    while(Utils.indexOf(myRandNum, ((randnum+1) + 2*j)) > -1){
-                        j++;
-                    }
-                    myRandNum[i] = (randnum+1) + 2*j;
-                }else if(randnum > 0 && randnum < 31){
+                uint randnum = _randomWords[i] % 32;
+                if(randnum < 30){
                     while(Utils.indexOf(myRandNum, ((randnum) + 2*j)) > -1){
                         j++;
                     }
@@ -413,20 +403,15 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
             _mintBatch(s_requests[_requestId].sender, ids, amounts, "");
         } else {
             uint r = Utils.randomNum(101);
-            uint randnum;
+            // 80% to pick a tokenId from 0 to 19
             if(r>=20){
-                // make sure to don't mint the tokenId 0
-                randnum = _randomWords[0] % 21;
-                if(randnum == 0){
-                    myRandNum[0] = randnum + 1;
-                } else {
-                    myRandNum[0] = randnum;
-                }
+                myRandNum[0] = _randomWords[0] % 20;
+            // 15% to pick a tokenId from 20 to 29
             } else if (r<20 && r>=5){
-                myRandNum[0] = (_randomWords[0] % 11) + 20;
+                myRandNum[0] = (_randomWords[0] % 10) + 20;
+            // 5% to pick a tokenId from 30 to 31
             } else {
-                // mint until tokenId 32
-                myRandNum[0] = (_randomWords[0] % 3) + 30;
+                myRandNum[0] = (_randomWords[0] % 2) + 30;
             }
             _mint(s_requests[_requestId].sender, myRandNum[0], 1, "");
         }
