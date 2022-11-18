@@ -32,6 +32,7 @@ import "./IRaffle.sol";
 // Utils functions
 import "./Utils.sol";
 
+
 /// @title Chad Sports Minting.
 /// @author Memepanze
 /** @notice ERC1155 Minting contract for Chad Sports.
@@ -57,7 +58,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         {
         name = "Chad Sports Testnet";
         symbol = "CHADTEST";
-        _uriBase = "ipfs://bafybeidtqkdn6uocf3iq6ilnko4zej44mpb3xn5h3yc72gg3c2cuvw6iha/"; // IPFS base for ChadSports collection
+        _uriBase = "ipfs://bafybeibstf4m6zsrm4hn5dcbbyb4xbbreesy4cbtvgnvj5rclnb6h5oriy"; // IPFS base for ChadSports collection
 
         mintPrice = 2 ether;
         // 20000000000000000
@@ -420,10 +421,9 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
             _mintBatch(s_requests[_requestId].sender, ids, amounts, "");
         } else {
             uint r = Utils.randomNum(101);
-            uint randnum;
             if(r>=20){
                 // tokenId start at 0
-                randnum = _randomWords[0] % 20;
+                myRandNum[0] = _randomWords[0] % 20;
             } else if (r<20 && r>=5){
                 myRandNum[0] = (_randomWords[0] % 10) + 20;
             } else {
