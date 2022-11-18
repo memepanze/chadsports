@@ -15,6 +15,10 @@ import "./Utils.sol";
 /// @notice ERC1155 Staking contract for Chad Sports to rank the teams and get rewarded.
 contract ChadStaking is Ownable, ReentrancyGuard {
 
+    constructor(address _nft) {
+        nft = IERC1155(_nft);
+    }
+
     /// @notice ERC1155 interface variable
     IERC1155 public nft;
 
@@ -37,7 +41,16 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     bool public isFinalRankingSet;
 
     /// @notice List of winners
-    address[] public winners;
+    address[] public winners4teams;
+
+    /// @notice List of winners
+    address[] public winners3teams;
+
+    /// @notice List of winners
+    address[] public winners2teams;
+
+    /// @notice List of winners
+    address[] public winners1team;
 
     /// @notice The end date for the minting
     /// @dev for the 2022 world cup 1670594400
@@ -68,32 +81,30 @@ contract ChadStaking is Ownable, ReentrancyGuard {
 
     error Chad__TransferFailed();
 
-    constructor(address _nft) {
-        nft = IERC1155(_nft);
-    }
+    error Chad__NotAWinner();
 
     /// @notice Get the 4 teams ranked in a submission
     /// @return An array of tokenIds
-    function getSubmission(uint256 _submissionId) external view returns(uint[] memory) {
+    function getSubmission(address _userAddr, uint256 _submissionId) external view returns(uint[] memory) {
         uint[] memory teams = new uint[](4);
-        teams[0] = submission[msg.sender][_submissionId][1];
-        teams[1] = submission[msg.sender][_submissionId][2];
-        teams[2] = submission[msg.sender][_submissionId][3];
-        teams[3] = submission[msg.sender][_submissionId][4];
+        teams[0] = submission[_userAddr][_submissionId][1];
+        teams[1] = submission[_userAddr][_submissionId][2];
+        teams[2] = submission[_userAddr][_submissionId][3];
+        teams[3] = submission[_userAddr][_submissionId][4];
 
         return teams;
     }
 
     /// @notice Get all the submissions for a wallet address
     /// @return An array of arrays of tokenIds
-    function getAllSubmissions() external view returns(uint[][] memory) {
-        uint[][] memory _allSub = new uint[][](submissionCount[msg.sender]);
-        for(uint i; i < submissionCount[msg.sender]; i++){
+    function getAllSubmissions(address _userAddr) external view returns(uint[][] memory) {
+        uint[][] memory _allSub = new uint[][](submissionCount[_userAddr]);
+        for(uint i; i < submissionCount[_userAddr]; i++){
             uint[] memory teams = new uint[](4);
-            teams[0] = submission[msg.sender][i][1];
-            teams[1] = submission[msg.sender][i][2];
-            teams[2] = submission[msg.sender][i][3];
-            teams[3] = submission[msg.sender][i][4];
+            teams[0] = submission[_userAddr][i][1];
+            teams[1] = submission[_userAddr][i][2];
+            teams[2] = submission[_userAddr][i][3];
+            teams[3] = submission[_userAddr][i][4];
 
             _allSub[i] = teams;
         }
@@ -155,6 +166,12 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         amounts[2] = 1;
         amounts[3] = 1;
 
+        // Track of the ownership of the NFTs which will be used to allow the user to unstake its staked ERC1155.
+        nftOwners[submission[msg.sender][_submissionId][1]][msg.sender]--;
+        nftOwners[submission[msg.sender][_submissionId][2]][msg.sender]--;
+        nftOwners[submission[msg.sender][_submissionId][3]][msg.sender]--;
+        nftOwners[submission[msg.sender][_submissionId][4]][msg.sender]--;
+
         delete submission[msg.sender][_submissionId][1];
         delete submission[msg.sender][_submissionId][2];
         delete submission[msg.sender][_submissionId][3];
@@ -175,12 +192,22 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         if(!isFinalRankingSet){
             revert Chad__FinalRankingNotSet();
         }
-        require(submission[msg.sender][_submissionId][1] == finalRanking[0], "Not eligible");
-        require(submission[msg.sender][_submissionId][2] == finalRanking[1], "Not eligible");
-        require(submission[msg.sender][_submissionId][3] == finalRanking[2], "Not eligible");
-        require(submission[msg.sender][_submissionId][4] == finalRanking[3], "Not eligible");
+        if(submission[msg.sender][_submissionId][1] == finalRanking[0]){
+            winners1team.push(msg.sender);
+            if(submission[msg.sender][_submissionId][2] == finalRanking[1]){
+                winners2teams.push(msg.sender);
+            }
+            if(submission[msg.sender][_submissionId][3] == finalRanking[2]){
+                winners3teams.push(msg.sender);
+            }
+            if(submission[msg.sender][_submissionId][4] == finalRanking[3]){
+                winners4teams.push(msg.sender);
+            }
+        } else {
+            revert Chad__NotAWinner();
+        }
         
-        winners.push(msg.sender);
+        winners4teams.push(msg.sender);
     }
 
     /// @notice Admin function to set the final ranking of the Top 4 for the World Cup.
@@ -199,12 +226,41 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         if(stakingPot == 0){
             revert Chad__BalanceIsEmpty();
         }
-        for(uint i; i < winners.length; i++){
-            
-            bool sent;
-            (sent, ) = address(winners[i]).call{value:stakingPot/winners.length}("");
-            if (!sent) {
-                revert Chad__TransferFailed();
+        if(winners4teams.length > 0){
+            for(uint i; i < winners4teams.length; i++){
+                
+                bool sent;
+                (sent, ) = address(winners4teams[i]).call{value:stakingPot/winners4teams.length}("");
+                if (!sent) {
+                    revert Chad__TransferFailed();
+                }
+            }
+        } else if(winners3teams.length > 0){
+            for(uint i; i < winners3teams.length; i++){
+                
+                bool sent;
+                (sent, ) = address(winners3teams[i]).call{value:stakingPot/winners3teams.length}("");
+                if (!sent) {
+                    revert Chad__TransferFailed();
+                }
+            }
+        } else if(winners2teams.length > 0){
+            for(uint i; i < winners2teams.length; i++){
+                
+                bool sent;
+                (sent, ) = address(winners2teams[i]).call{value:stakingPot/winners2teams.length}("");
+                if (!sent) {
+                    revert Chad__TransferFailed();
+                }
+            }
+        } else if(winners1team.length > 0){
+            for(uint i; i < winners1team.length; i++){
+                
+                bool sent;
+                (sent, ) = address(winners1team[i]).call{value:stakingPot/winners1team.length}("");
+                if (!sent) {
+                    revert Chad__TransferFailed();
+                }
             }
         }
     }

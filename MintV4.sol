@@ -48,6 +48,46 @@ import "./Utils.sol";
 contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFConsumerBaseV2, Ownable {
     using Strings for uint256;
 
+    // vrf coordinator {addres} Avalanche Fuji 0x2eD832Ba664535e5886b75D64C46EB9a228C2610
+    // vrf coordinator {addres} Avalanche Mainnet 0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634
+    // vrf coordinator {addres} Ethereum Goerli 0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D 
+    // vrf coordinator {addres} Ethereum Mainnet 0x271682DEB8C4E0901D1a1550aD2e64D568E69909
+    constructor(uint64 _vrfSubId, address _vrfCoordinator, bytes32 _keyHash) ERC1155("")
+        VRFConsumerBaseV2(_vrfCoordinator)
+        {
+        name = "Chad Sports Testnet";
+        symbol = "CHADTEST";
+        _uriBase = "ipfs://bafybeidtqkdn6uocf3iq6ilnko4zej44mpb3xn5h3yc72gg3c2cuvw6iha/"; // IPFS base for ChadSports collection
+
+        mintPrice = 2 ether;
+        // 20000000000000000
+        discountMintPrice = 1 ether;
+        // 10000000000000000
+
+        mintBatchPrice = 8 ether;
+        // 80000000000000000
+        discountMintBatchPrice = 6 ether;
+        // 60000000000000000
+
+        mintRandomPrice = 1 ether;
+        // 10000000000000000
+        discountMintRandomPrice = 0.5 ether;
+        // 5000000000000000
+
+        mintBatchRandomPrice = 4 ether;
+        // 40000000000000000
+        discountMintBatchRandomPrice = 2 ether;
+        // 20000000000000000
+        
+        // Avalanche Fuji 0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61
+        // Avalanche Mainnet 0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92
+        // Ethereum Goerli 0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15
+        // Ethereum Mainnet 0x89630569c9567e43c4fe7b1633258df9f2531b62f2352fa721cf3162ee4ecb46
+        keyHash = _keyHash;
+        s_subscriptionId = _vrfSubId;
+        vrfCoordinator = _vrfCoordinator;
+    }
+
     /// @notice The Name of collection 
     string public name;
     /// @notice The Symbol of collection 
@@ -89,6 +129,8 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     mapping(uint256 => RequestStatus) public s_requests; /* requestId --> requestStatus */
     // VRFCoordinatorV2Interface COORDINATOR;
 
+    /// @notice The vrf coordinator address
+    address vrfCoordinator;
     /// @notice The subscription ID (Chainlink VRF)
     uint64 s_subscriptionId;
 
@@ -101,7 +143,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
       * For a list of available gas lanes on each network,
       * see https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#configurations
       */
-    bytes32 keyHash = 0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61;
+    bytes32 keyHash;
 
     /** @notice Depends on the number of requested values that you want sent to the
       * fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -121,7 +163,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     uint32 numWordsBatch = 4;
 
     /// @notice royalties recipient address
-    address _recipient;
+    address public _recipient;
 
     /// @notice The standard mint price for single specific mint
     uint internal mintPrice;
@@ -152,6 +194,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     /// @param randomWords number of random numbers requested
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
 
+    /// @notice Emitted on withdrawBalance() 
     event BalanceWithdraw(address to, uint amount);
 
     // E R R O R S
@@ -222,36 +265,6 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         _;
     }
 
-    constructor(uint64 _vrfSubId) ERC1155("")
-        VRFConsumerBaseV2(0x2eD832Ba664535e5886b75D64C46EB9a228C2610)
-        {
-        name = "ChadSports";
-        symbol = "CHAD";
-        _uriBase = "ipfs://QmQyoRPzJpceXmv3uApjam8hLYXwRgThvg8vQ4wdWX9p4M/"; // IPFS base for ChadSports collection
-
-        mintPrice = 2 ether;
-        // 20000000000000000
-        discountMintPrice = 1 ether;
-        // 10000000000000000
-
-        mintBatchPrice = 8 ether;
-        // 80000000000000000
-        discountMintBatchPrice = 6 ether;
-        // 60000000000000000
-
-        mintRandomPrice = 1 ether;
-        // 10000000000000000
-        discountMintRandomPrice = 0.5 ether;
-        // 5000000000000000
-
-        mintBatchRandomPrice = 4 ether;
-        // 40000000000000000
-        discountMintBatchRandomPrice = 2 ether;
-        // 20000000000000000
-
-        s_subscriptionId = _vrfSubId;
-    }
-
     /// @notice Set the start date (timestamp) for the minting.
     function setStartDate(uint _date) external onlyOwner {
         startDate = _date;
@@ -312,6 +325,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     /// @notice Mint specific tokenIDs.
     /// @param _ids An array of the tokenIDs to mint.
     /// @dev the array must contain 1 or 4 values
+    /// @dev the tokenIds are from 1 to 32
     function mint(uint[] memory _ids) public payable nonReentrant isEOA
         payableMint(_ids) {
         if(_ids.length > 1){
@@ -330,6 +344,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         IRaffle(raffle).incrementMinters(msg.sender);
     }
 
+    /// @notice Store the address of each random minters to be used in the callback function for the Raffle contract interface.
     mapping (uint => address) randomMinters;
 
     /// @notice Function to request random numbers.
@@ -340,7 +355,7 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     function mintRandom(uint _numberOfNFTs) external payable nonReentrant isEOA 
         payableRandomMint(_numberOfNFTs) returns (uint256 requestId) {
         // Will revert if subscription is not set and funded.
-        requestId = VRFCoordinatorV2Interface(0x2eD832Ba664535e5886b75D64C46EB9a228C2610).requestRandomWords(
+        requestId = VRFCoordinatorV2Interface(vrfCoordinator).requestRandomWords(
             keyHash,
             s_subscriptionId,
             requestConfirmations,
@@ -374,7 +389,9 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         if(_randomWords.length>1){
             for(uint i=0; i<_randomWords.length; i++){
                 uint j;
+                // The contract start the tokenId at 0 so the mximum tokenId is 31
                 uint randnum = _randomWords[i] % 32;
+                // checks to get unique random numbers in the myRandNum array
                 if(randnum < 30){
                     while(Utils.indexOf(myRandNum, ((randnum) + 2*j)) > -1){
                         j++;
@@ -403,14 +420,14 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
             _mintBatch(s_requests[_requestId].sender, ids, amounts, "");
         } else {
             uint r = Utils.randomNum(101);
-            // 80% to pick a tokenId from 0 to 19
+            uint randnum;
             if(r>=20){
-                myRandNum[0] = _randomWords[0] % 20;
-            // 15% to pick a tokenId from 20 to 29
+                // tokenId start at 0
+                randnum = _randomWords[0] % 20;
             } else if (r<20 && r>=5){
                 myRandNum[0] = (_randomWords[0] % 10) + 20;
-            // 5% to pick a tokenId from 30 to 31
             } else {
+                // until tokenId 31
                 myRandNum[0] = (_randomWords[0] % 2) + 30;
             }
             _mint(s_requests[_requestId].sender, myRandNum[0], 1, "");
