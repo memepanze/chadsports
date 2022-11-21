@@ -40,19 +40,16 @@ contract Raffle is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
 
     // vrf coordinator {addres} Avalanche Fuji 0x2eD832Ba664535e5886b75D64C46EB9a228C2610
     // vrf coordinator {addres} Avalanche Mainnet 0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634
-    // vrf coordinator {addres} Ethereum Goerli 0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D 
-    // vrf coordinator {addres} Ethereum Mainnet 0x271682DEB8C4E0901D1a1550aD2e64D568E69909
     constructor(uint64 _vrfSubId, address _vrfCoordinator, bytes32 _keyHash, uint _cap, uint32 _nbrWinners) VRFConsumerBaseV2(_vrfCoordinator)
     {
         firstMintersCap = _cap;
         numberOfWinners = _nbrWinners;
 
         // Avalanche Fuji 0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61
-        // Avalanche Mainnet 0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92
-        // Ethereum Goerli 0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15
-        // Ethereum Mainnet 0x89630569c9567e43c4fe7b1633258df9f2531b62f2352fa721cf3162ee4ecb46
+        // Avalanche Mainnet 0x89630569c9567e43c4fe7b1633258df9f2531b62f2352fa721cf3162ee4ecb46
         keyHash = _keyHash;
         s_subscriptionId = _vrfSubId;
+        vrfCoordinator = _vrfCoordinator;
     }
 
     /// @notice The address of the NFT minting contract
@@ -88,6 +85,9 @@ contract Raffle is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     /// @notice The list of randomly selected winners from the over first 500 minters.
     address[] public lastMintersWinners;
 
+    /// @notice The vrf coordinator address
+    address vrfCoordinator;
+
     /// @notice The struct used for the VRF requests
     struct RequestStatus {
         address sender; // msg.sender of the request
@@ -111,7 +111,7 @@ contract Raffle is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
       * For a list of available gas lanes on each network,
       * see https://docs.chain.link/docs/vrf/v2/subscription/supported-networks/#configurations
       */
-    bytes32 keyHash = 0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61;
+    bytes32 keyHash;
 
     /** @notice Depends on the number of requested values that you want sent to the
       * fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -189,14 +189,14 @@ contract Raffle is VRFConsumerBaseV2, Ownable, ReentrancyGuard {
     // V R F
 
     /// @notice Admin function to change the VRF subscription ID
-    function changeSubscription(uint64 _sub) external onlyOwner {
+    function changeSubscriptionVRF(uint64 _sub) external onlyOwner {
         s_subscriptionId = _sub;
     }
 
     /// @notice Request random numbers from the VRF and call the fulfillRandomWords.
     function randomWinners() external onlyOwner returns (uint256 requestId) {
         // Will revert if subscription is not set and funded.
-        requestId = VRFCoordinatorV2Interface(0x2eD832Ba664535e5886b75D64C46EB9a228C2610).requestRandomWords(
+        requestId = VRFCoordinatorV2Interface(vrfCoordinator).requestRandomWords(
             keyHash,
             s_subscriptionId,
             requestConfirmations,

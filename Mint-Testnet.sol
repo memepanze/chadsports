@@ -51,14 +51,12 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
 
     // vrf coordinator {addres} Avalanche Fuji 0x2eD832Ba664535e5886b75D64C46EB9a228C2610
     // vrf coordinator {addres} Avalanche Mainnet 0xd5D517aBE5cF79B7e95eC98dB0f0277788aFF634
-    // vrf coordinator {addres} Ethereum Goerli 0x2Ca8E0C643bDe4C2E08ab1fA0da3401AdAD7734D 
-    // vrf coordinator {addres} Ethereum Mainnet 0x271682DEB8C4E0901D1a1550aD2e64D568E69909
     constructor(uint64 _vrfSubId, address _vrfCoordinator, bytes32 _keyHash) ERC1155("")
         VRFConsumerBaseV2(_vrfCoordinator)
         {
         name = "Chad Sports Testnet";
         symbol = "CHADTEST";
-        _uriBase = "ipfs://bafybeibstf4m6zsrm4hn5dcbbyb4xbbreesy4cbtvgnvj5rclnb6h5oriy"; // IPFS base for ChadSports collection
+        _uriBase = "ipfs://bafybeibstf4m6zsrm4hn5dcbbyb4xbbreesy4cbtvgnvj5rclnb6h5oriy/"; // IPFS base for ChadSports collection
 
         mintPrice = 2 ether;
         // 20000000000000000
@@ -82,8 +80,6 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
         
         // Avalanche Fuji 0x354d2f95da55398f44b7cff77da56283d9c6c829a4bdf1bbcaf2ad6a4d081f61
         // Avalanche Mainnet 0xff8dedfbfa60af186cf3c830acbc32c05aae823045ae5ea7da1e45fbfaba4f92
-        // Ethereum Goerli 0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15
-        // Ethereum Mainnet 0x89630569c9567e43c4fe7b1633258df9f2531b62f2352fa721cf3162ee4ecb46
         keyHash = _keyHash;
         s_subscriptionId = _vrfSubId;
         vrfCoordinator = _vrfCoordinator;
@@ -223,13 +219,16 @@ contract ChadSports is ERC1155, ERC1155Supply, IERC2981, ReentrancyGuard, VRFCon
     modifier payableMint(uint[] memory _ids) {
         require(block.timestamp >= startDate && block.timestamp <= endDate);
         if(_ids.length > 1){
-            if(discountlist[msg.sender]){
-                require(msg.value >= discountMintBatchPrice/100);
-            } else if(chadlist[msg.sender].isAuthorized) {
-                require(!chadlist[msg.sender].hasMint);
-                chadlist[msg.sender].hasMint = true;
-            } else{
-                require(msg.value >= mintBatchPrice/100);
+            if(chadlist[msg.sender].isAuthorized){
+                if(!chadlist[msg.sender].hasMint){
+                    chadlist[msg.sender].hasMint = true;
+                } else {
+                    require(msg.value >= discountMintBatchPrice);
+                }
+            } else if(discountlist[msg.sender]){
+                require(msg.value >= discountMintBatchPrice);
+            } else {
+                require(msg.value >= mintBatchPrice);
             }
         } else {
             if(discountlist[msg.sender]){
