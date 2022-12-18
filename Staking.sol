@@ -41,16 +41,10 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     bool public isFinalRankingSet;
 
     /// @notice List of winners
-    address[] public winners4teams;
+    address[] public winners;
 
     /// @notice List of winners
-    address[] public winners3teams;
-
-    /// @notice List of winners
-    address[] public winners2teams;
-
-    /// @notice List of winners
-    address[] public winners1team;
+    mapping(uint => uint) public SubmissionWinType;
 
     /// @notice The end date for the minting
     /// @dev for the 2022 world cup 1670594400
@@ -59,7 +53,7 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     // M O D I F I E R
 
     /// @notice NFTs hodlers can change their rankings until 1 hour before the Top 16
-    modifier changeRankings {
+    modifier competitionPeriod {
         require(block.timestamp <= endDate);
         _;
     }
@@ -114,7 +108,7 @@ contract ChadStaking is Ownable, ReentrancyGuard {
 
     /// @notice User stake batch 4 teams (ERC1155) by ranking the NFTs from 1 to 4.
     /// @dev This function can be called before the start of the Top 16 of the world cup.
-    function stakeBatch(uint8 _rank1, uint8 _rank2, uint8 _rank3, uint8 _rank4) external nonReentrant changeRankings {
+    function stakeBatch(uint8 _rank1, uint8 _rank2, uint8 _rank3, uint8 _rank4) external nonReentrant competitionPeriod {
 
         // track of the number of submissions by address
         uint subId = submissionCount[msg.sender];
@@ -187,29 +181,6 @@ contract ChadStaking is Ownable, ReentrancyGuard {
 
     // R E W A R D
 
-    /// @notice Check if a ranking submission is winning.
-    function isWinner(uint _submissionId) external {
-        if(!isFinalRankingSet){
-            revert Chad__FinalRankingNotSet();
-        }
-        if(submission[msg.sender][_submissionId][1] == finalRanking[0]){
-            winners1team.push(msg.sender);
-            if(submission[msg.sender][_submissionId][2] == finalRanking[1]){
-                winners2teams.push(msg.sender);
-            }
-            if(submission[msg.sender][_submissionId][3] == finalRanking[2]){
-                winners3teams.push(msg.sender);
-            }
-            if(submission[msg.sender][_submissionId][4] == finalRanking[3]){
-                winners4teams.push(msg.sender);
-            }
-        } else {
-            revert Chad__NotAWinner();
-        }
-        
-        winners4teams.push(msg.sender);
-    }
-
     /// @notice Admin function to set the final ranking of the Top 4 for the World Cup.
     function setFinalRanking(uint _1, uint _2, uint _3, uint _4) public onlyOwner {
         finalRanking[0] = _1;
@@ -219,48 +190,26 @@ contract ChadStaking is Ownable, ReentrancyGuard {
         isFinalRankingSet = true;
     }
 
-    
-    /// @notice Admin function to reward the list of Winners
-    function rewardWinners() external onlyOwner {
+    /// @notice Owner Function to add and reward winners
+    function rewardWinners(address[] memory _winners) external onlyOwner {
         uint stakingPot = address(this).balance;
+        // Check if the Final Ranking is Set (done by the Owner after the competition ends)
+        if(!isFinalRankingSet){
+            revert Chad__FinalRankingNotSet();
+        }
+        // Check if the Prize Pool is deposited in the Contract
         if(stakingPot == 0){
             revert Chad__BalanceIsEmpty();
         }
-        if(winners4teams.length > 0){
-            for(uint i; i < winners4teams.length; i++){
-                
-                bool sent;
-                (sent, ) = address(winners4teams[i]).call{value:stakingPot/winners4teams.length}("");
-                if (!sent) {
-                    revert Chad__TransferFailed();
-                }
-            }
-        } else if(winners3teams.length > 0){
-            for(uint i; i < winners3teams.length; i++){
-                
-                bool sent;
-                (sent, ) = address(winners3teams[i]).call{value:stakingPot/winners3teams.length}("");
-                if (!sent) {
-                    revert Chad__TransferFailed();
-                }
-            }
-        } else if(winners2teams.length > 0){
-            for(uint i; i < winners2teams.length; i++){
-                
-                bool sent;
-                (sent, ) = address(winners2teams[i]).call{value:stakingPot/winners2teams.length}("");
-                if (!sent) {
-                    revert Chad__TransferFailed();
-                }
-            }
-        } else if(winners1team.length > 0){
-            for(uint i; i < winners1team.length; i++){
-                
-                bool sent;
-                (sent, ) = address(winners1team[i]).call{value:stakingPot/winners1team.length}("");
-                if (!sent) {
-                    revert Chad__TransferFailed();
-                }
+        // Loop through the addresses _winners[]
+        for(uint i; i < _winners.length;i++){
+            // Push each address to the winners[] list
+            winners.push(_winners[i]);
+            bool sent;
+            // Send a portion of the Prize Pool
+            (sent, ) = address(_winners[i]).call{value:stakingPot/_winners.length}("");
+            if (!sent) {
+                revert Chad__TransferFailed();
             }
         }
     }
@@ -274,6 +223,9 @@ contract ChadStaking is Ownable, ReentrancyGuard {
     /// @param _to Recipient of the withdrawal
     function withdrawBalance(address _to) external onlyOwner nonReentrant {
         uint amount = address(this).balance;
+        if(amount == 0){
+            revert Chad__BalanceIsEmpty();
+        }
         bool sent;
 
         (sent, ) = _to.call{value: amount}("");
